@@ -1,0 +1,22 @@
+name: fetch-osm-data
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica gli zip
+        run: |
+          mkdir zips && cd zips
+          for f in simplified-water-polygons-split-3857 water-polygons-split-3857 \
+                   antarctica-icesheet-polygons-3857 antarctica-icesheet-outlines-3857; do
+            curl -fL --retry 3 -O https://osmdata.openstreetmap.de/download/$f.zip
+          done
+          curl -fL --retry 3 -O https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_boundary_lines_land.zip \
+            || curl -fL --retry 3 -O "https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/ne_110m_admin_0_boundary_lines_land.zip"
+          ls -lh
+      - name: Pubblica come release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create data zips/*.zip --repo ${{ github.repository }} --title data --notes "OSM external data"
