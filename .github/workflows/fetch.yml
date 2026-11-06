@@ -23,7 +23,7 @@ jobs:
             f=$1; shift
             for u in "$@"; do
               echo "provo $u"
-              curl -fL --connect-timeout 20 --retry 2 -o "$f" "$u" && return 0
+              curl -fL --connect-timeout 120 --retry 2 -o "$f" "$u" && return 0
             done
             return 1
           }
