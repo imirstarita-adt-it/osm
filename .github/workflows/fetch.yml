@@ -6,17 +6,38 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
+      - name: Test raggiungibilità
+        run: |
+          for u in \
+            https://osmdata.openstreetmap.de/download/water-polygons-split-3857.zip \
+            https://data.openstreetmapdata.com/water-polygons-split-3857.zip \
+            http://data.openstreetmapdata.com/water-polygons-split-3857.zip \
+            https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_boundary_lines_land.zip ; do
+            echo "== $u"
+            curl -sI --connect-timeout 15 --max-time 30 "$u" | head -5 || echo "FALLITO ($?)"
+          done
       - name: Scarica gli zip
         run: |
           mkdir zips && cd zips
-          for f in simplified-water-polygons-split-3857 water-polygons-split-3857 \
+          get() {  # nome-file url1 url2 ...
+            f=$1; shift
+            for u in "$@"; do
+              echo "provo $u"
+              curl -fL --connect-timeout 20 --retry 2 -o "$f" "$u" && return 0
+            done
+            return 1
+          }
+          for n in simplified-water-polygons-split-3857 water-polygons-split-3857 \
                    antarctica-icesheet-polygons-3857 antarctica-icesheet-outlines-3857; do
-            curl -fL --retry 3 -O https://osmdata.openstreetmap.de/download/$f.zip
+            get $n.zip https://osmdata.openstreetmap.de/download/$n.zip \
+                       https://data.openstreetmapdata.com/$n.zip || echo "NON SCARICATO: $n"
           done
-          curl -fL --retry 3 -O https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_boundary_lines_land.zip \
-            || curl -fL --retry 3 -O "https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/ne_110m_admin_0_boundary_lines_land.zip"
+          get ne_110m_admin_0_boundary_lines_land.zip \
+            https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_boundary_lines_land.zip || true
           ls -lh
       - name: Pubblica come release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create data zips/*.zip --repo ${{ github.repository }} --title data --notes "OSM external data"
+        run: |
+          gh release delete data --yes --cleanup-tag --repo ${{ github.repository }} || true
+          gh release create data zips/*.zip --repo ${{ github.repository }} --title data --notes "OSM external data"
